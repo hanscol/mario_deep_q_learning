@@ -1,5 +1,4 @@
 # mario_deep_q_learning
 
 Setup:
-- [ ] pip install gym-pull
-- [ ] python download.py
+- [ ] pip install gym-super-mario-bros
