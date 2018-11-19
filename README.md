@@ -1,5 +1,5 @@
 # Project Title
-mario_deep_q_learning
+Mario with Deep Q-Learning
 
 ## Getting Started
 ```
