@@ -1,6 +1,7 @@
-# mario_deep_q_learning
+# Project Title
+mario_deep_q_learning
 
-Setup:
+## Getting Started
 ```
 pip install gym-super-mario-bros
 ```
