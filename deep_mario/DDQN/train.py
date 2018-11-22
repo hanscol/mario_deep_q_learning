@@ -1,18 +1,14 @@
 from __future__ import print_function, division
-import torch
 from torchvision import transforms
-from models import *
+from DQN.models import *
 import numpy as np
 from skimage import transform, color
-import matplotlib.pyplot as plt
-import random
 
 from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv
-import time
 import gym_super_mario_bros
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
 
-from data import *
+from DQN.data import *
 
 
 def preprocess(x, size, final_height):
@@ -36,8 +32,9 @@ def maxQ(state, model, device):
         q_vals = q_vals.squeeze()
         max_q = torch.max(q_vals)
         max_a = torch.argmax(q_vals)
+        max_a = max_a.type(torch.long)
 
-        return max_q, max_a
+        return max_q, max_a, q_vals
 
 
 def QLoss(output, targets):
@@ -84,28 +81,39 @@ def main():
     width = 84
     resize_height = 110
     final_height = 84
+    size = [channels, final_height, width]
 
     batch_size = 32
-    replay_capacity = 6000
-    epsilon = 1.0
-    gamma = 0.90
+    replay_capacity = 1000000
+    replay_dir = '/home/hansencb/mario_replay/'
+    epsilon = 1
+    gamma = 0.9
 
     use_cuda = torch.cuda.is_available()
     torch.manual_seed(1)
     device = torch.device("cuda" if use_cuda else "cpu")
 
     model = simple_net(channels, len(movement), device).to(device)
+    target_model = simple_net(channels, len(movement), device).to(device)
+
     model_file = 'mario_agent'
     model.load_state_dict(torch.load(model_file))
+    target_model.load_state_dict(torch.load(model_file))
 
-    lr = 0.01
-    optimizer = torch.optim.Adam(model.parameters(), lr = lr)
+    lr = 0.001
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+    total_reward_file ='total_reward.txt'
+    with open(total_reward_file, 'w') as f:
+        f.write('Reward\tSteps\n')
+
 
 
     max_steps = 5000
-    num_eps = 4000
+    num_eps = 1000
 
-    data = dataset(replay_capacity, batch_size)
+    data = dataset(replay_capacity, batch_size, replay_dir, 1, size)
+
 
     for episode in range(num_eps):
         print('Episode {}'.format(episode+1))
@@ -114,27 +122,33 @@ def main():
         state = torch.cat((state, state, state, state))
         action = 0
 
+        episode_reward = 0
+
         for step in range(max_steps):
             if step % 3 == 0:
                 if random.random() < epsilon:
                     action = random.randint(0,len(movement)-1)
                 else:
-                    q_val, action = maxQ(state, model, device)
+                    q_val, action, q_vals = maxQ(state, model, device)
 
             next_state, reward, done, info = env.step(int(action))
-            if reward != 0:
-                reward = reward/abs(reward)
+
+            if reward > 0:
+                reward = 1
+            else:
+                reward = -1
+
+            episode_reward += reward
 
             next_state = preprocess(next_state, [resize_height, width], final_height)
             next_state = torch.cat((state[1:,:,:], next_state))
-            next_q, next_a = maxQ(next_state, model, device)
+            n_q, n_a, n_vals = maxQ(next_state, model, device)
+            t_q, t_a, t_vals = maxQ(next_state, target_model, device)
+            next_q = t_vals[n_a]
 
-            trans = transition(state, action, reward, next_q, done, gamma)
+            trans = transition(state[3,:,:], action, reward, next_q, done, gamma)
             data.add(trans)
-
-            #learn something
             train(model, device, optimizer, data.get_batch())
-            #print(reward)
 
             state = next_state
 
@@ -142,14 +156,21 @@ def main():
             #time.sleep(0.03)
 
             if done:
+                with open(total_reward_file, 'a') as f:
+                    f.write('{}\t{}\n'.format(episode_reward, step))
+
                 break
 
         epsilon -= (1 / num_eps)
         if episode % 10 == 0:
+            target_model.load_state_dict(model.state_dict())
+
             with open(model_file, 'wb') as f:
                 torch.save(model.state_dict(), f)
 
+
     env.close()
+
 
 
 
