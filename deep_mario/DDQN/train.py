@@ -1,6 +1,6 @@
 from __future__ import print_function, division
 from torchvision import transforms
-from DQN.models import *
+from DDQN.models import *
 import numpy as np
 from skimage import transform, color
 
@@ -8,7 +8,7 @@ from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv
 import gym_super_mario_bros
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
 
-from DQN.data import *
+from DDQN.data import *
 
 
 def preprocess(x, size, final_height):
@@ -20,21 +20,6 @@ def preprocess(x, size, final_height):
     x = transforms.ToTensor()(x)
     x = x.type(torch.float32)
     return x
-
-
-def maxQ(state, model, device):
-    model.eval()
-    with torch.no_grad():
-        state = state.expand(1, -1, -1, -1)
-        state = state.to(device)
-        q_vals = model(state)
-        q_vals = torch.Tensor.cpu(q_vals)
-        q_vals = q_vals.squeeze()
-        max_q = torch.max(q_vals)
-        max_a = torch.argmax(q_vals)
-        max_a = max_a.type(torch.long)
-
-        return max_q, max_a, q_vals
 
 
 def QLoss(output, targets):
@@ -84,10 +69,12 @@ def main():
     size = [channels, final_height, width]
 
     batch_size = 32
-    replay_capacity = 1000000
+    replay_capacity = 100000
     replay_dir = '/home/hansencb/mario_replay/'
-    epsilon = 1
+    epsilon = 0.5
     gamma = 0.9
+
+    start_epsilon = epsilon
 
     use_cuda = torch.cuda.is_available()
     torch.manual_seed(1)
@@ -97,8 +84,8 @@ def main():
     target_model = simple_net(channels, len(movement), device).to(device)
 
     model_file = 'mario_agent'
-    model.load_state_dict(torch.load(model_file))
-    target_model.load_state_dict(torch.load(model_file))
+    #model.load_state_dict(torch.load(model_file))
+    #target_model.load_state_dict(torch.load(model_file))
 
     lr = 0.001
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -142,13 +129,13 @@ def main():
 
             next_state = preprocess(next_state, [resize_height, width], final_height)
             next_state = torch.cat((state[1:,:,:], next_state))
-            n_q, n_a, n_vals = maxQ(next_state, model, device)
-            t_q, t_a, t_vals = maxQ(next_state, target_model, device)
-            next_q = t_vals[n_a]
 
-            trans = transition(state[3,:,:], action, reward, next_q, done, gamma)
+
+            trans = transition(state, action, reward, next_state, done)
+
             data.add(trans)
-            train(model, device, optimizer, data.get_batch())
+
+            train(model, device, optimizer, data.get_batch(model, target_model, device, gamma))
 
             state = next_state
 
@@ -161,7 +148,9 @@ def main():
 
                 break
 
-        epsilon -= (1 / num_eps)
+        if episode > 500:
+            epsilon -= (start_epsilon / (num_eps-500))
+
         if episode % 10 == 0:
             target_model.load_state_dict(model.state_dict())
 

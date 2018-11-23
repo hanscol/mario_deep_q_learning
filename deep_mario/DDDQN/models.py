@@ -17,8 +17,10 @@ class simple_net(torch.nn.Module):
         self.bn2 = torch.nn.BatchNorm2d(64)
         self.conv3 = torch.nn.Conv2d(64, 128, 3, stride=1, padding=1)
         self.bn3 = torch.nn.BatchNorm2d(128)
-        self.full1 = torch.nn.Linear(12800, 512)
-        self.full2 = torch.nn.Linear(512, output_channels)
+        self.adv_fc = torch.nn.Linear(12800, 512)
+        self.adv = torch.nn.Linear(512, output_channels)
+        self.val_fc = torch.nn.Linear(12800, 512)
+        self.val = torch.nn.Linear(512, 1)
         self.relu = torch.nn.ReLU()
 
     def forward(self, x):
@@ -27,8 +29,11 @@ class simple_net(torch.nn.Module):
         x = self.conv3(self.relu(self.bn2(x)))
         x = self.bn3(x)
         x = x.view(-1, x.shape[1]*x.shape[2]*x.shape[3])
-        x = self.full1(self.relu(x))
-        x = self.full2(self.relu(x))
+        a = self.adv_fc(self.relu(x))
+        a = self.adv(self.relu(a))
+        v = self.val_fc(self.relu(x))
+        v = self.val(self.relu(v))
+
+        x = torch.add(v, torch.sub(a.permute([1,0]), torch.mean(a, dim=1)).permute([1,0]))
+
         return x
-
-

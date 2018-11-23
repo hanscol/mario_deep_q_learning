@@ -1,6 +1,6 @@
 from __future__ import print_function, division
 from torchvision import transforms
-from DQN.models import *
+from DDDQN.models import *
 import numpy as np
 from skimage import transform, color
 
@@ -8,7 +8,7 @@ from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv
 import gym_super_mario_bros
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
 
-from DQN.data import *
+from DDDQN.data import *
 
 
 def preprocess(x, size, final_height):
@@ -71,8 +71,10 @@ def main():
     batch_size = 32
     replay_capacity = 100000
     replay_dir = '/home/hansencb/mario_replay/'
-    epsilon = 1
+    epsilon = 1.0
     gamma = 0.9
+
+    start_epsilon = epsilon
 
     use_cuda = torch.cuda.is_available()
     torch.manual_seed(1)
@@ -82,8 +84,8 @@ def main():
     target_model = simple_net(channels, len(movement), device).to(device)
 
     model_file = 'mario_agent'
-    model.load_state_dict(torch.load(model_file))
-    target_model.load_state_dict(torch.load(model_file))
+    #model.load_state_dict(torch.load(model_file))
+    #target_model.load_state_dict(torch.load(model_file))
 
     lr = 0.001
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -114,7 +116,7 @@ def main():
                 if random.random() < epsilon:
                     action = random.randint(0,len(movement)-1)
                 else:
-                    q_val, action = maxQ(state, model, device)
+                    q_val, action, q_vals = maxQ(state, model, device)
 
             next_state, reward, done, info = env.step(int(action))
 
@@ -130,7 +132,7 @@ def main():
 
             trans = transition(state, action, reward, next_state, done)
             data.add(trans)
-            train(model, device, optimizer, data.get_batch(model, device, gamma))
+            train(model, device, optimizer, data.get_batch(model, target_model, device, gamma))
 
             state = next_state
 
@@ -143,7 +145,9 @@ def main():
 
                 break
 
-        epsilon -= (1 / num_eps)
+        if episode > 0:
+            epsilon -= (start_epsilon / (num_eps))
+
         if episode % 10 == 0:
             target_model.load_state_dict(model.state_dict())
 
