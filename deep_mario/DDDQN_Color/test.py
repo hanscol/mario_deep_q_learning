@@ -1,6 +1,6 @@
 from __future__ import print_function, division
 from torchvision import transforms
-from DQN.models import *
+from DDDQN_Color.models import *
 import numpy as np
 from skimage import transform, color
 import time
@@ -9,15 +9,18 @@ from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv
 import gym_super_mario_bros
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
 
-from DQN.data import *
+from DDDQN_Color.data import *
 
 
-def preprocess(x, size, final_height):
-    x = color.rgb2gray(x)
+def preprocess(x, size, final_height, bottom_chop):
+    #x = color.rgb2gray(x)
     x = transform.resize(x, size, mode='constant', anti_aliasing=True)
-    x = x[size[0]-final_height:, :]
+    x = x[(size[0]-final_height-bottom_chop):size[0]-bottom_chop, :, :]
 
-    x = np.expand_dims(x, axis=2)
+    # plt.imshow(x)
+    # plt.show()
+
+    #x = np.expand_dims(x, axis=2)
     x = transforms.ToTensor()(x)
     x = x.type(torch.float32)
     return x
@@ -43,23 +46,23 @@ def main():
     movement.append(['left', 'A'])
     movement.append(['left', 'B'])
     movement.append(['left', 'A', 'B'])
-    movement.append(['B'])
-    movement.append(['down'])
-    movement.append(['up'])
+    #movement.append(['B'])
+    #movement.append(['down'])
+    #movement.append(['up'])
 
     env = gym_super_mario_bros.make('SuperMarioBros-1-1-v0')
     env = BinarySpaceToDiscreteSpaceEnv(env, movement)
 
     #channels is acting as the number of frames in history
     #if resize_height and height are different, assert final_height < resize_height and image will be cropped
-    channels = 4
-    width = 84
-    resize_height = 110
-    final_height = 84
-
+    channels = 3
+    frames = 4
+    width = 128
+    resize_height = 180
+    final_height = 128
+    bottom_chop = 15
 
     epsilon = 0.0
-
 
     use_cuda = torch.cuda.is_available()
     torch.manual_seed(1)
@@ -78,7 +81,7 @@ def main():
     for episode in range(num_eps):
         print('Episode {}'.format(episode+1))
         state = env.reset()
-        state = preprocess(state, [resize_height, width], final_height)
+        state = preprocess(state, [resize_height, width, 3], final_height, bottom_chop)
         state = torch.cat((state, state, state, state))
         action = 0
 
@@ -100,8 +103,8 @@ def main():
 
             episode_reward += reward
 
-            next_state = preprocess(next_state, [resize_height, width], final_height)
-            next_state = torch.cat((state[1:,:,:], next_state))
+            next_state = preprocess(next_state, [resize_height, width, 3], final_height, bottom_chop)
+            next_state = torch.cat((state[3:,:,:], next_state))
 
             state = next_state
 
