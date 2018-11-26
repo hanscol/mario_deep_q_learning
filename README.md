@@ -1,5 +1,5 @@
 # Project Title
-Mario with Deep Q-Learning
+Mario with Double Dueling Deep Q-Learning
 
 ## Getting Started
 ```
