@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-path = 'DDDQN_PER/total_reward.txt'
+path = '/home/local/VANDERBILT/bayrakrg/mario_deep_q_learning/deep_mario/Results/reward/total_reward.txt'
 
 rewards = np.zeros([0])
 steps = np.zeros([0])
@@ -13,8 +13,10 @@ with open(path, 'r') as f:
         steps = np.append(steps, int(step))
 
 
-plt.plot(steps)
-plt.show()
+fig, ax = plt.subplots(2, 1)
+ax[0].plot(rewards, label='Color DDDQN')
+ax[0].set_ylabel(' Total Reinforcement')
 
-plt.plot(rewards)
-plt.show()
+ax[1].plot(steps, label='Color DDDQN')
+ax[1].set_ylabel('# of Steps')
+ax[1].set_xlabel('# of Epoch')
