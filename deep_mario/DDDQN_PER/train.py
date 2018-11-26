@@ -66,9 +66,9 @@ def main():
     movement.append(['left', 'A'])
     movement.append(['left', 'B'])
     movement.append(['left', 'A', 'B'])
-    movement.append(['B'])
-    movement.append(['down'])
-    movement.append(['up'])
+    #movement.append(['B'])
+    #movement.append(['down'])
+    #movement.append(['up'])
 
     env = gym_super_mario_bros.make('SuperMarioBros-1-1-v0')
     env = BinarySpaceToDiscreteSpaceEnv(env, movement)
@@ -84,13 +84,15 @@ def main():
     final_height = 128
     size = [channels, final_height, width]
 
-    batch_size = 32
+    batch_size = 64
     replay_capacity = 100000
     replay_dir = '/home/hansencb/mario_replay/'
-    epsilon = 0.3
-    gamma = 0.9
 
-    start_epsilon = epsilon
+    gamma = 0.95
+
+    start_epsilon = 1.0
+    stop_epsilon = 0.01
+    epsilon_decay = 0.00001
 
     use_cuda = torch.cuda.is_available()
     torch.manual_seed(1)
@@ -103,7 +105,7 @@ def main():
     model.load_state_dict(torch.load(model_file))
     target_model.load_state_dict(torch.load(model_file))
 
-    lr = 0.001
+    lr = 0.00025
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     total_reward_file ='total_reward.txt'
@@ -113,7 +115,7 @@ def main():
 
 
     max_steps = 5000
-    num_eps = 1000
+    num_eps = 5000
 
     data = dataset(replay_capacity, batch_size, replay_dir, size)
 
@@ -128,10 +130,13 @@ def main():
         action = random.randint(0,len(movement)-1)
         next_state, reward, done, info = env.step(int(action))
 
-        if reward>0:
-            reward = 1
-        else:
-            reward = -1
+        # if reward>0:
+        #     reward = 1
+        # else:
+        #     reward = -1
+        reward /= 15
+        if reward == 0:
+            reward = -0.1
 
         next_state = preprocess(next_state, [resize_height, width], final_height)
         next_state = torch.cat((state[1:, :, :], next_state))
@@ -141,6 +146,10 @@ def main():
 
         state = next_state
 
+
+    tau = 0
+    max_tau = 10000
+    decay_step = 0
 
     #training loop
     for episode in range(num_eps):
@@ -153,18 +162,26 @@ def main():
         episode_reward = 0
 
         for step in range(max_steps):
-            if step % 3 == 0:
-                if random.random() < epsilon:
-                    action = random.randint(0,len(movement)-1)
-                else:
-                    q_val, action, q_vals = maxQ(state, model, device)
+            tau += 1
+
+            epsilon = stop_epsilon+(start_epsilon - stop_epsilon)*np.exp(-epsilon_decay*decay_step)
+            if random.random() < epsilon:
+                action = random.randint(0,len(movement)-1)
+            else:
+                q_val, action, q_vals = maxQ(state, model, device)
 
             next_state, reward, done, info = env.step(int(action))
 
-            if reward > 0:
-                reward = 1
-            else:
-                reward = -1
+
+
+            # if reward > 0:
+            #     reward = 1
+            # else:
+            #     reward = -1
+
+            reward /= 15
+            if reward == 0:
+                reward = -0.1
 
             episode_reward += reward
 
@@ -183,18 +200,18 @@ def main():
             env.render()
             #time.sleep(0.03)
 
-            if done:
-                with open(total_reward_file, 'a') as f:
-                    f.write('{}\t{}\n'.format(episode_reward, step))
+            if tau > max_tau:
+                target_model.load_state_dict(model.state_dict())
+                tau = 0
 
+            if done:
                 break
 
-        if episode > 0:
-            epsilon -= (start_epsilon / (num_eps))
+        decay_step += step
+        with open(total_reward_file, 'a') as f:
+            f.write('{}\t{}\n'.format(episode_reward, step))
 
-        if episode % 10 == 0:
-            target_model.load_state_dict(model.state_dict())
-
+        if episode % 5 == 0:
             with open(model_file, 'wb') as f:
                 torch.save(model.state_dict(), f)
 

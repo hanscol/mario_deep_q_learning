@@ -1,31 +1,34 @@
+from pynput.keyboard import Key, Listener
 from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv
-import time
 import gym_super_mario_bros
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
+
+movement= SIMPLE_MOVEMENT
 env = gym_super_mario_bros.make('SuperMarioBros-1-1-v0')
+env = BinarySpaceToDiscreteSpaceEnv(env, movement)
+key_map = {"'d'":1, "'w'":5, "'a'":6 }
+state = env.reset()
 
-#env = BinarySpaceToDiscreteSpaceEnv(env, SIMPLE_MOVEMENT)
-
-custom_movement = SIMPLE_MOVEMENT
-custom_movement.append(['left', 'A'])
-custom_movement.append(['left', 'B'])
-custom_movement.append(['left', 'A', 'B'])
-custom_movement.append(['B'])
-custom_movement.append(['down'])
-custom_movement.append(['up'])
-
-env = BinarySpaceToDiscreteSpaceEnv(env, custom_movement)
-
-
-#actions defined by integers 0-6
-
-done = True
-for step in range(5000):
-    if done:
-        state = env.reset()
-    action = env.action_space.sample()
-    state, reward, done, info = env.step(action)
+def on_press(key):
+    key = str(key)
+    print(key in key_map)
+    if key in key_map:
+        next_state, reward, done, info = env.step(int(key_map[key]))
+    else:
+        next_state, reward, done, info = env.step(int(0))
     env.render()
-    time.sleep(0.03)
 
-env.close()
+def on_release(key):
+    print('{0} release'.format(
+        key))
+    if key == Key.esc:
+        # Stop listener
+        return False
+
+
+# Collect events until released
+with Listener(
+        on_press=on_press,
+        on_release=on_release) as listener:
+    print('hello')
+    listener.join()

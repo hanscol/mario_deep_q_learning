@@ -43,9 +43,10 @@ def main():
     movement.append(['left', 'A'])
     movement.append(['left', 'B'])
     movement.append(['left', 'A', 'B'])
-    movement.append(['B'])
-    movement.append(['down'])
-    movement.append(['up'])
+
+    #movement.append(['B'])
+    #movement.append(['down'])
+    #movement.append(['up'])
 
     env = gym_super_mario_bros.make('SuperMarioBros-1-1-v0')
     env = BinarySpaceToDiscreteSpaceEnv(env, movement)
@@ -78,6 +79,7 @@ def main():
     num_eps = 1
 
 
+
     for episode in range(num_eps):
         print('Episode {}'.format(episode+1))
         state = env.reset()
@@ -88,7 +90,7 @@ def main():
         episode_reward = 0
 
         for step in range(max_steps):
-            if step % 3 == 0:
+            if step % 1 == 0:
                 if random.random() < epsilon:
                     action = random.randint(0,len(movement)-1)
                 else:
@@ -96,10 +98,15 @@ def main():
 
             next_state, reward, done, info = env.step(int(action))
 
-            if reward > 0:
-                reward = 1
-            else:
-                reward = -1
+            # if reward > 0:
+            #     reward = 1
+            # else:
+            #     reward = -1
+
+            reward /= 15
+            if reward == 0:
+                reward = -0.1
+            print(reward)
 
             episode_reward += reward
 

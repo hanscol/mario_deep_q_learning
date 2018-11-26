@@ -11,30 +11,29 @@ class simple_net(torch.nn.Module):
         super(simple_net, self).__init__()
         self.device = device
 
-        self.conv1 = torch.nn.Conv2d(input_channels, 16, 8, stride=4, padding=1)
-        self.bn1 = torch.nn.BatchNorm2d(16)
-        self.conv2 = torch.nn.Conv2d(16, 32, 6, stride=2, padding=1)
-        self.bn2 = torch.nn.BatchNorm2d(32)
-        self.conv3 = torch.nn.Conv2d(32, 64, 4, stride=1, padding=1)
-        self.bn3 = torch.nn.BatchNorm2d(64)
-        self.conv4 = torch.nn.Conv2d(64, 128, 4, stride=1, padding=1)
-        self.bn4 = torch.nn.BatchNorm2d(128)
-        self.conv5 = torch.nn.Conv2d(128, 256, 3, stride=1, padding=1)
-        self.bn5 = torch.nn.BatchNorm2d(256)
-        self.adv_fc = torch.nn.Linear(36864, 512)
-        self.adv = torch.nn.Linear(512, output_channels)
-        self.val_fc = torch.nn.Linear(36864, 512)
-        self.val = torch.nn.Linear(512, 1)
+        f = [32, 64, 128]
+        self.conv1 = torch.nn.Conv2d(input_channels, f[0], 8, stride=4, padding=1)
+        self.bn1 = torch.nn.BatchNorm2d(f[0])
+        self.conv2 = torch.nn.Conv2d(f[0], f[1], 4, stride=2, padding=1)
+        self.bn2 = torch.nn.BatchNorm2d(f[1])
+        self.conv3 = torch.nn.Conv2d(f[1], f[2], 4, stride=2, padding=1)
+        self.bn3 = torch.nn.BatchNorm2d(f[2])
+
+        ff = 512
+        self.adv_fc = torch.nn.Linear(6272, ff)
+        self.adv = torch.nn.Linear(ff, output_channels)
+        self.val_fc = torch.nn.Linear(6272, ff)
+        self.val = torch.nn.Linear(ff, 1)
         self.relu = torch.nn.ReLU()
 
     def forward(self, x):
         x = self.conv1(x)
         x = self.conv2(self.relu(self.bn1(x)))
         x = self.conv3(self.relu(self.bn2(x)))
-        x = self.conv4(self.relu(self.bn3(x)))
-        x = self.conv5(self.relu(self.bn4(x)))
-        x = self.bn5(x)
+        x = self.bn3(x)
+
         x = x.view(-1, x.shape[1]*x.shape[2]*x.shape[3])
+
         a = self.adv_fc(self.relu(x))
         a = self.adv(self.relu(a))
         v = self.val_fc(self.relu(x))
