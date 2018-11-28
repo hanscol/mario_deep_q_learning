@@ -5,4 +5,6 @@
 ```
 pip install gym-super-mario-bros
 ```
+
+## Demo Play
 ![](ezgif.com-video-to-gif.gif)
