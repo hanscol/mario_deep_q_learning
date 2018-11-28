@@ -48,7 +48,7 @@ def main():
     #movement.append(['down'])
     #movement.append(['up'])
 
-    env = gym_super_mario_bros.make('SuperMarioBros-1-1-v0')
+    env = gym_super_mario_bros.make('SuperMarioBros-v0')
     env = BinarySpaceToDiscreteSpaceEnv(env, movement)
 
     #channels is acting as the number of frames in history
@@ -62,7 +62,7 @@ def main():
     final_height = 128
 
 
-    epsilon = 0.0
+    epsilon = 0.00
 
 
     use_cuda = torch.cuda.is_available()

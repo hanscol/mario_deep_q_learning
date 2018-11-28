@@ -84,15 +84,15 @@ def main():
     final_height = 128
     size = [channels, final_height, width]
 
-    batch_size = 64
+    batch_size = 16
     replay_capacity = 100000
     replay_dir = '/home/hansencb/mario_replay/'
 
     gamma = 0.95
 
-    start_epsilon = 1.0
+    start_epsilon = 0.3
     stop_epsilon = 0.01
-    epsilon_decay = 0.00001
+    epsilon_decay = 0.00025
 
     use_cuda = torch.cuda.is_available()
     torch.manual_seed(1)
@@ -101,55 +101,68 @@ def main():
     model = simple_net(channels, len(movement), device).to(device)
     target_model = simple_net(channels, len(movement), device).to(device)
 
+    data_file = 'data_loader'
     model_file = 'mario_agent'
+    continue_train = True
     model.load_state_dict(torch.load(model_file))
-    target_model.load_state_dict(torch.load(model_file))
 
-    lr = 0.00025
+    if continue_train:
+        target_model.load_state_dict(torch.load(model_file))
+
+    lr = 0.00005
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     total_reward_file ='total_reward.txt'
-    with open(total_reward_file, 'w') as f:
-        f.write('Reward\tSteps\n')
 
+
+    if not continue_train:
+        with open(total_reward_file, 'w') as f:
+            f.write('Reward\tSteps\n')
 
 
     max_steps = 5000
     num_eps = 5000
 
-    data = dataset(replay_capacity, batch_size, replay_dir, size)
+    if continue_train:
+        with open(data_file, 'rb') as f:
+            data = pickle.load(f)
+            data.batch_size = batch_size
+    else:
+        data = dataset(replay_capacity, batch_size, replay_dir, size)
 
-    #initialize memory with 100 experiences
-    done = True
-    for i in range(100):
-        if done:
-            state = env.reset()
-            state = preprocess(state, [resize_height, width], final_height)
-            state = torch.cat((state, state, state, state))
+        #initialize memory with 100 experiences
+        done = True
+        for i in range(100):
+            if done:
+                state = env.reset()
+                state = preprocess(state, [resize_height, width], final_height)
+                state = torch.cat((state, state, state, state))
 
-        action = random.randint(0,len(movement)-1)
-        next_state, reward, done, info = env.step(int(action))
+            action = random.randint(0,len(movement)-1)
+            next_state, reward, done, info = env.step(int(action))
 
-        # if reward>0:
-        #     reward = 1
-        # else:
-        #     reward = -1
-        reward /= 15
-        if reward == 0:
-            reward = -0.1
+            # if reward>0:
+            #     reward = 1
+            # else:
+            #     reward = -1
+            reward /= 15
+            if reward == 0:
+                reward = -0.1
 
-        next_state = preprocess(next_state, [resize_height, width], final_height)
-        next_state = torch.cat((state[1:, :, :], next_state))
+            next_state = preprocess(next_state, [resize_height, width], final_height)
+            next_state = torch.cat((state[1:, :, :], next_state))
 
-        trans = transition(state, action, reward, next_state, done)
-        data.add(trans)
+            trans = transition(state, action, reward, next_state, done)
+            data.add(trans)
 
-        state = next_state
+            state = next_state
 
 
     tau = 0
-    max_tau = 10000
+    max_tau = 2000
     decay_step = 0
+    farthest = 3000
+    cur_x = 1
 
     #training loop
     for episode in range(num_eps):
@@ -164,7 +177,12 @@ def main():
         for step in range(max_steps):
             tau += 1
 
-            epsilon = stop_epsilon+(start_epsilon - stop_epsilon)*np.exp(-epsilon_decay*decay_step)
+
+            #epsilon = stop_epsilon+(start_epsilon - stop_epsilon)*np.exp(-epsilon_decay*decay_step)
+            epsilon = start_epsilon * np.exp(1-(1/(cur_x/farthest)))
+            if epsilon < stop_epsilon:
+                epsilon = stop_epsilon
+
             if random.random() < epsilon:
                 action = random.randint(0,len(movement)-1)
             else:
@@ -172,7 +190,10 @@ def main():
 
             next_state, reward, done, info = env.step(int(action))
 
+            cur_x = info['x_pos']
 
+            if cur_x > farthest:
+                farthest = cur_x
 
             # if reward > 0:
             #     reward = 1
@@ -214,6 +235,8 @@ def main():
         if episode % 5 == 0:
             with open(model_file, 'wb') as f:
                 torch.save(model.state_dict(), f)
+            with open(data_file, 'wb') as f:
+                pickle.dump(data, f)
 
 
     env.close()
