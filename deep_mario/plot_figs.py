@@ -15,11 +15,24 @@ with open(path, 'r') as f:
 
 fig, ax = plt.subplots(2, 1)
 ax[0].plot(rewards, label='Color DDDQN')
-ax[0].set_ylabel(' Total Reinforcement')
+ax[0].set_ylabel(' Total Reinforcement', fontsize=32)
+
+for tick in ax[0].xaxis.get_major_ticks():
+    tick.label.set_fontsize(26)
+
+for tick in ax[0].yaxis.get_major_ticks():
+    tick.label.set_fontsize(26)
 
 ax[1].plot(steps, label='Color DDDQN')
-ax[1].set_ylabel('# of Steps')
-ax[1].set_xlabel('# of Epoch')
+ax[1].set_ylabel('# of Steps', fontsize=32)
+ax[1].set_xlabel('Episode', fontsize=32)
+
+for tick in ax[1].xaxis.get_major_ticks():
+    tick.label.set_fontsize(26)
+
+for tick in ax[1].yaxis.get_major_ticks():
+    tick.label.set_fontsize(26)
+
 plt.show()
 
 x = np.arange(len(rewards))
@@ -33,5 +46,5 @@ ax[0].set_ylabel(' Total Reinforcement')
 
 ax[1].plot(x, steps,  label='Color DDDQN')
 ax[1].set_ylabel('# of Steps')
-ax[1].set_xlabel('# of Epoch')
+ax[1].set_xlabel('# of Episodes')
 plt.show()

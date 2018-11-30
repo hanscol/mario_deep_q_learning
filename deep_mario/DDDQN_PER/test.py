@@ -48,7 +48,7 @@ def main():
     #movement.append(['down'])
     #movement.append(['up'])
 
-    env = gym_super_mario_bros.make('SuperMarioBros-v0')
+    env = gym_super_mario_bros.make('SuperMarioBros-1-1-v0')
     env = BinarySpaceToDiscreteSpaceEnv(env, movement)
 
     #channels is acting as the number of frames in history
@@ -71,7 +71,7 @@ def main():
 
     model = simple_net(channels, len(movement), device).to(device)
 
-    model_file = 'mario_agent'
+    model_file = 'mario_agent_1st_level_passed'
     model.load_state_dict(torch.load(model_file))
 
 
@@ -116,7 +116,7 @@ def main():
             state = next_state
 
             env.render()
-            time.sleep(0.03)
+            time.sleep(0.1)
 
             if done:
                 break
